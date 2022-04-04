@@ -1,0 +1,111 @@
+"Phrases"
+{
+	"Prefix_Chat"
+	{
+		"en"	"{lightred}[Redie]{purple} "
+	}
+	
+	// -----
+	// Command phrases (!redie - !ghost)
+	// -----
+	
+	"Command_NowGhost"
+	{
+		"en"	"You're now a Ghost! Use the menu to enable noclip or to become a spectator."
+		"fr"	"Vous êtes maintenant un Fantôme ! Utilisez le menu pour activer le noclip ou pour devenir un spectateur."
+	}
+	
+	"Command_MustBeDead"
+	{
+		"en"	"You must be dead to become a Ghost!"
+		"fr"	"Vous devez être mort pour devenir un Fantôme !"
+	}
+	
+	"Command_MaxUsages"
+	{
+		"en"	"You used this command too much for this round, wait for the next one to become a Ghost again."
+		"fr"	"Vous avez trop utilisé cette commande pour ce round, attendez le prochain pour redevenir un Fantôme."
+	}
+	
+	"Command_Cooldown"
+	{
+		"en"	"Please wait a few seconds before writing that command again."
+		"fr"	"Veuillez attendre quelques secondes avant de réécrire cette commande."
+	}
+	
+	// -----
+	// Menu phrases
+	// -----
+	
+	"Menu_Title"
+	{
+		"en"	"Redie"
+		"fr"	"Redie"
+	}
+	
+	"Menu_EnableNoclip"
+	{
+		"en"	"Enable noclip"
+		"fr"	"Activer le noclip"
+	}
+	
+	"Menu_NoclipEnabled"
+	{
+		"en"	"Noclip {lightgreen}enabled{purple}!"
+		"fr"	"Noclip {lightgreen}activé{purple} !"
+	}
+	
+	"Menu_DisableNoclip"
+	{
+		"en"	"Disable noclip"
+		"fr"	"Désactiver le noclip"
+	}
+	
+	"Menu_NoclipDisabled"
+	{
+		"en"	"Noclip {lightred}disabled{purple}!"
+		"fr"	"Noclip {lightred}désactivé{purple} !"
+	}
+	
+	"Menu_AlreadyOpen"
+	{
+		"en"	"Another menu is already open, type !redie to open the Redie menu."
+		"fr"	"Un autre menu est déjà ouvert, tapez !redie pour ouvrir le menu Redie."
+	}
+	
+	"Menu_Remind"
+	{
+		"en"	"Write !redie to re-open the Redie menu."
+		"fr"	"Ecrivez !redie pour ré-ouvrir le menu Redie."
+	}
+	
+	"Menu_Stop"
+	{
+		"en"	"Stop being a ghost"
+		"fr"	"Arrêter d'être un fantôme"
+	}
+	
+	"Menu_NoLongerGhost"
+	{
+		"en"	"You're not a Ghost anymore."
+		"fr"	"Vous n'êtes désormais plus un Fantôme."
+	}
+	
+	// -----
+	// Other phrases
+	// -----
+	
+	"Other_DoorBlock"
+	{
+		"en"	"You were put out of Ghost mode because you blocked a door."
+		"fr"	"Vous avez été retiré du mode Fantôme car vous avez bloqué une porte."
+	}
+	
+	"Other_DoorBlock_Public"
+	{
+		// {1} = playername
+		"#format"	"{1:s}"
+		"en"		"{1} blocked a door as a Ghost!"
+		"fr"		"{1} a bloqué une porte en tant que Fantôme !"
+	}
+}
