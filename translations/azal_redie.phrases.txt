@@ -33,6 +33,12 @@
 		"fr"	"Veuillez attendre quelques secondes avant de réécrire cette commande."
 	}
 	
+	"Command_MustBeInTeam"
+	{
+		"en"	"You must be in a team to become a Ghost!"
+		"fr"	"Vous devez être dans une équipe pour devenir un Fantôme !"
+	}
+	
 	// -----
 	// Menu phrases
 	// -----
@@ -91,6 +97,30 @@
 		"fr"	"Vous n'êtes désormais plus un Fantôme."
 	}
 	
+	"Menu_EnableTriggerTeleport"
+	{
+		"en"	"Enable teleport triggers"
+		"fr"	"Activer les zones de téléportation"
+	}
+	
+	"Menu_TriggerTeleportEnabled"
+	{
+		"en"	"Teleport triggers {lightgreen}enabled{purple}!"
+		"fr"	"Zones de téléportation {lightgreen}activées{purple} !"
+	}
+	
+	"Menu_DisableTriggerTeleport"
+	{
+		"en"	"Disable teleport triggers"
+		"fr"	"Désactiver les zones de téléportation"
+	}
+	
+	"Menu_TriggerTeleportDisabled"
+	{
+		"en"	"Teleport triggers  {lightred}disabled{purple}!"
+		"fr"	"Zones de téléportation {lightred}désactivées{purple} !"
+	}
+	
 	// -----
 	// Other phrases
 	// -----
@@ -107,5 +137,19 @@
 		"#format"	"{1:s}"
 		"en"		"{1} blocked a door as a Ghost!"
 		"fr"		"{1} a bloqué une porte en tant que Fantôme !"
+	}
+	
+	"Other_KnifeBlock"
+	{
+		"en"	"You were put out of Ghost mode because you blocked a knife attack."
+		"fr"	"Vous avez été retiré du mode Fantôme car vous avez bloqué une attaque au couteau."
+	}
+	
+	"Other_KnifeBlock_Public"
+	{
+		// {1} = playername
+		"#format"	"{1:s}"
+		"en"		"{1} blocked a knife attack as a Ghost!"
+		"fr"		"{1} a bloqué une attaque au couteau en tant que Fantôme !"
 	}
 }

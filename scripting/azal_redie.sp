@@ -13,7 +13,7 @@ Credits:
 #include <azalib>
 #include <colorvariables>
 
-#define PLUGIN_VERSION "0.8.2 BETA"
+#define PLUGIN_VERSION "0.8.3 BETA"
 
 #define LIFE_ALIVE 0
 #define LIFE_DYING 1
@@ -43,6 +43,24 @@ Convar cvarCooldown;
 Convar cvarTriggerTeleport;
 Convar cvarBlockDoor;
 Convar cvarBlockDoorNotify;
+Convar cvarBlockKnife;
+Convar cvarBlockKnifeNotify;
+
+Convar cvarLogging;
+
+enum struct Preferences
+{
+	bool noclip;
+	bool trigger_teleport;
+	
+	void Reset()
+	{
+		this.noclip = false;
+		this.trigger_teleport = true;
+	}
+}
+
+Preferences g_ePreferences[MAXPLAYERS + 1];
 
 public Plugin myinfo =
 {
@@ -64,6 +82,10 @@ public void OnPluginStart()
 	cvarTriggerTeleport = new Convar("azal_redie_triggerteleport", "0", "0 = trigger_teleport works normally\n1 = trigger_teleport doesn't get triggered, but an experimental method is used to teleport the Ghost (might not be accurate)\n2 = block trigger_teleport for Ghosts", _, true, 0.0, true, 2.0);
 	cvarBlockDoor = new Convar("azal_redie_blockdoor", "1", "When a Ghost blocks a door:\n0 = don't do anything\n1 = kill them\n2 = make them respawn as a Ghost (unghost then ghost again)", _, true, 0.0, true, 2.0);
 	cvarBlockDoorNotify = new Convar("azal_redie_blockdoor_notify", "1", "If azal_redie_blockdoor is other than 0, and a Ghost blocks a door:\n0 = don't send a message to everyone\n1 = send a message to everyone in the server saying that the Ghost player is blocking a door", _, true, 0.0, true, 1.0);
+	cvarBlockKnife = new Convar("azal_redie_blockknife", "1", "When a Ghost blocks a knife attack:\n0 = don't do anything\n1 = kill them\n2 = make them respawn as a Ghost (unghost then ghost again)", _, true, 0.0, true, 2.0);
+	cvarBlockKnifeNotify = new Convar("azal_redie_blockknife_notify", "1", "If azal_redie_blockknife is other than 0, and a Ghost blocks a knife attack:\n0 = don't send a message to everyone\n1 = send a message to everyone in the server saying that the Ghost player blocked a knife attack", _, true, 0.0, true, 1.0);
+	
+	cvarLogging = new Convar("azal_redie_logging", "1", "0 = minimum logs (important events only, such as if a Ghost blocked a door)\n1 = normal logs (actions experimental hooks, config load confirmation)\n2 = dev logs (a lot of infos)", _, true, 0.0, true, 2.0);
 	Convar.CreateConfig("azal_redie");
 	
 	// Commands
@@ -76,6 +98,8 @@ public void OnPluginStart()
 	AddNormalSoundHook(OnNormalSound);
 	HookEntityOutput("func_door", "OnBlockedOpening", OnDoorBlocked);
 	HookEntityOutput("func_door", "OnBlockedClosing", OnDoorBlocked);
+	HookEntityOutput("func_door_rotating", "OnBlockedOpening", OnDoorBlocked);
+	HookEntityOutput("func_door_rotating", "OnBlockedClosing", OnDoorBlocked);
 	
 	// Other
 	LoadTranslations("azal_redie.phrases");
@@ -85,23 +109,26 @@ public void OnPluginStart()
 	BuildPath(Path_SM, kvPath, sizeof(kvPath), "configs/azal_redie.cfg"); // Get cfg file
 	KeyValues kv = new KeyValues("azal_redie");
 	if (!kv.ImportFromFile(kvPath))
-		SetFailState("Unable to import configs/azal_redie.cfg");
-	
-	// KeyValues: Cache BlockEntities for quick access
-	if (!kv.JumpToKey("BlockEntities"))
-		SetFailState("The BlockEntities section is not present in configs/azal_redie.cfg");
-	if (kv.GotoFirstSubKey(false))
+		LogMessage("The configs/azal_redie.cfg config file doesn't exist. Most entities, including triggers, won't be blocked!");
+	else
 	{
-		int index;
-		char section[40];
-		do
+		// KeyValues: Cache BlockEntities for quick access
+		if (!kv.JumpToKey("BlockEntities"))
+			SetFailState("The BlockEntities section is not present in configs/azal_redie.cfg");
+		if (kv.GotoFirstSubKey(false))
 		{
-			kv.GetSectionName(section, sizeof(section));
-			LogMessage("Blocked %s from config!", section);
-			strcopy(g_sHookEntities[index], sizeof(g_sHookEntities[]), section);
-			index++;
+			int index;
+			char section[40];
+			do
+			{
+				kv.GetSectionName(section, sizeof(section));
+				if (cvarLogging.IntValue >= 1)
+					LogMessage("Blocked %s from config!", section);
+				strcopy(g_sHookEntities[index], sizeof(g_sHookEntities[]), section);
+				index++;
+			}
+			while (kv.GotoNextKey(false));
 		}
-		while (kv.GotoNextKey(false));
 	}
 	delete kv;
 	
@@ -202,7 +229,28 @@ Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &damage, i
 {
 	if (!IsValidEntity(victim) || !g_bIsGhost[victim])
 		return Plugin_Continue;
-
+	
+	if (cvarBlockKnife.IntValue >= 1)
+	{
+		if (1 <= attacker <= MaxClients)
+			LogMessage("%L blocked the knife attack of %L", victim, attacker);
+		else
+			LogMessage("%L blocked the knife attack of an unknown player", victim);
+		
+		UnGhost(victim);
+		if (cvarBlockKnife.IntValue == 2)
+			Ghost(victim);
+		
+		char buffer[200];
+		GetPhrase("Other_KnifeBlock", buffer, sizeof(buffer), victim);
+		CPrintToChat(victim, buffer);
+		if (cvarBlockKnifeNotify.BoolValue)
+		{
+			GetClientName(victim, buffer, sizeof(buffer));
+			Format(buffer, sizeof(buffer), "%T%T", "Prefix_Chat", LANG_SERVER, "Other_KnifeBlock_Public", LANG_SERVER, buffer);
+			CPrintToChatAll(buffer);
+		}
+	}
 	return Plugin_Handled; // Bullets go through Ghosts.
 }
 
@@ -302,17 +350,23 @@ Action TriggerTeleportHook(int entity, int other)
 	if (g_fLastTP[other] > GetGameTime() - TP_COOLDOWN) // The player teleported less than 10 ticks ago. Don't do anything to prevent huge calculations and multiple TPs.
 		return Plugin_Handled;
 	
+	if (!g_ePreferences[other].trigger_teleport) // The player disabled teleport triggers
+		return Plugin_Handled;
+	
 	g_fLastTP[other] = GetGameTime();
 	// Teleport the player to the destination
 	// KeyValues are Prop_Data
-	LogMessage("trigger_teleport test");
+	if (cvarLogging.IntValue == 2)
+		LogMessage("trigger_teleport test");
 	// https://github.com/scen/ionlib/blob/master/src/sdk/hl2_csgo/game/server/triggers.cpp#L2433
 	char sEntityName[40];
 	if (HasEntProp(entity, Prop_Data, "m_target"))
 		GetEntPropString(entity, Prop_Data, "m_target", sEntityName, sizeof(sEntityName)); // Get the "Remote Destination"
 	else
 		return Plugin_Handled;
-	LogMessage("has target: %s", sEntityName);
+	
+	if (cvarLogging.IntValue == 2)
+		LogMessage("has target: %s", sEntityName);
 	// TODO: Handle "Local Destination Landmark": Prop_Data "m_iLandmark"
 	
 	char sEntityNameTemp[40];
@@ -352,7 +406,8 @@ Action TriggerTeleportHook(int entity, int other)
 	GetEntPropVector(lastEntity, Prop_Send, "m_vecOrigin", pos); // retrieves the position of the entity
 	TeleportEntity(other, pos, NULL_VECTOR, NULL_VECTOR);
 	
-	LogMessage("Teleported %L", other); // TODO: REMOVE LOGGING
+	if (cvarLogging.IntValue >= 1)
+		LogMessage("Teleported %L", other);
 	
 	return Plugin_Handled; // Blocks collision with the entity, not activating it.
 }
@@ -366,6 +421,9 @@ Action TriggerHurtHook(int entity, int other)
 	{
 		case 0:
 		{
+			if (g_ePreferences[other].noclip) // If the ghost is in noclip, don't deal any damage
+				return Plugin_Handled;
+			
 			return Plugin_Continue;
 		}
 		case 1:
@@ -374,7 +432,8 @@ Action TriggerHurtHook(int entity, int other)
 		}
 		case 2:
 		{
-			UnGhost(other);
+			if (!g_ePreferences[other].noclip)
+				UnGhost(other);
 			return Plugin_Handled;
 		}
 	}
@@ -400,6 +459,13 @@ Action Cmd_Ghost(int client, int args)
 	if (!client)
 	{
 		ReplyToCommand(client, "You can't run this command from the server's console!");
+		return Plugin_Handled;
+	}
+	
+	int team = GetClientTeam(client);
+	if (team != CS_TEAM_CT && team != CS_TEAM_T)
+	{
+		CReplyToCommand(client, "%t", "Command_MustBeInTeam");
 		return Plugin_Handled;
 	}
 	
@@ -443,6 +509,7 @@ Action Cmd_Ghost(int client, int args)
 
 void Ghost(int client)
 {
+	g_ePreferences[client].Reset();
 	g_bIsGhost[client] = true;
 	g_iHealth[client] = 100;
 	g_bStripWeapons[client] = true;
@@ -500,11 +567,21 @@ void ShowRedieMenu(int client, bool force=false)
 	Menu menu = new Menu(RedieMenu);
 	menu.SetTitle("%T", "Menu_Title", client);
 	
-	if (GetEntProp(client, Prop_Send, "movetype") == view_as<int>(MOVETYPE_NOCLIP))
+	//if (GetEntProp(client, Prop_Send, "movetype") == view_as<int>(MOVETYPE_NOCLIP))
+	if (g_ePreferences[client].noclip)
 		FormatEx(buffer, sizeof(buffer), "%T", "Menu_DisableNoclip", client);
 	else
 		FormatEx(buffer, sizeof(buffer), "%T", "Menu_EnableNoclip", client);
 	menu.AddItem("noclip", buffer);
+	
+	if (cvarTriggerTeleport.IntValue == 1)
+	{
+		if (g_ePreferences[client].trigger_teleport)
+			FormatEx(buffer, sizeof(buffer), "%T", "Menu_DisableTriggerTeleport", client);
+		else
+			FormatEx(buffer, sizeof(buffer), "%T", "Menu_EnableTriggerTeleport", client);
+		menu.AddItem("toggle_trigger_teleport", buffer);
+	}
 	
 	FormatEx(buffer, sizeof(buffer), "%T", "Menu_Stop", client);
 	menu.AddItem("redie", buffer);
@@ -525,7 +602,8 @@ int RedieMenu(Menu menu, MenuAction action, int param1, int param2)
 			menu.GetItem(param2, buffer, sizeof(buffer));
 			if (StrEqual(buffer, "noclip"))
 			{
-				if (GetEntProp(param1, Prop_Send, "movetype") == view_as<int>(MOVETYPE_NOCLIP))
+				//if (GetEntProp(param1, Prop_Send, "movetype") == view_as<int>(MOVETYPE_NOCLIP))
+				if (g_ePreferences[param1].noclip)
 				{
 					SetEntProp(param1, Prop_Send, "movetype", MOVETYPE_WALK);
 					GetPhrase("Menu_NoclipDisabled", buffer, sizeof(buffer), param1);
@@ -535,6 +613,17 @@ int RedieMenu(Menu menu, MenuAction action, int param1, int param2)
 					SetEntProp(param1, Prop_Send, "movetype", MOVETYPE_NOCLIP);
 					GetPhrase("Menu_NoclipEnabled", buffer, sizeof(buffer), param1);
 				}
+				g_ePreferences[param1].noclip = !g_ePreferences[param1].noclip;
+				
+				ShowRedieMenu(param1);
+			}
+			else if (StrEqual(buffer, "toggle_trigger_teleport"))
+			{
+				g_ePreferences[param1].trigger_teleport = !g_ePreferences[param1].trigger_teleport
+				if (g_ePreferences[param1].trigger_teleport)
+					GetPhrase("Menu_TriggerTeleportEnabled", buffer, sizeof(buffer), param1);
+				else
+					GetPhrase("Menu_TriggerTeleportDisabled", buffer, sizeof(buffer), param1);
 				
 				ShowRedieMenu(param1);
 			}
@@ -576,6 +665,7 @@ void OnDoorBlocked(const char[] output, int caller, int activator, float delay)
 	if (!(0 < activator <= MaxClients) || !g_bIsGhost[activator])
 		return;
 	
+	LogMessage("%L blocked a door", activator);
 	UnGhost(activator);
 	char buffer[200];
 	GetPhrase("Other_DoorBlock", buffer, sizeof(buffer), activator);
