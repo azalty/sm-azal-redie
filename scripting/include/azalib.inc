@@ -4,7 +4,7 @@
 #endif
 #define _AzaLib_included_
 
-// AzaLib version: 1.0.1
+// AzaLib version: 1.0.2
 
 /**
  * Rounds a floating point number using the "Round to nearest, ties away from zero" rounding rule.
@@ -17,14 +17,27 @@
  */
 stock int AzaLib_RoundHalfAwayZero(float value)
 {
-	if (value % 1 == 0.5)
+	bool negative;
+	if (value < 0.0)
 	{
-		if (value > 0)
-			return RoundToFloor(value) + 1;
-		else
-			return RoundToFloor(value);
+		negative = true;
+		value = -value;
 	}
-	return RoundToNearest(value);
+	
+	// If decimal is 0.5
+	if (value - RoundToFloor(value) == 0.5)
+	{
+		if (!negative)
+			return RoundToCeil(value);
+		else
+			return -RoundToCeil(value);
+	}
+	
+	// If decimal isn't 0.5
+	if (!negative)
+		return RoundToNearest(value);
+	else
+		return RoundToNearest(-value);
 }
 
 /**
