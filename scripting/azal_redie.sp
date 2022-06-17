@@ -13,7 +13,7 @@ Credits:
 #include <azalib>
 #include <colorvariables>
 
-#define PLUGIN_VERSION "0.8.3 BETA"
+#define PLUGIN_VERSION "0.8.4 BETA"
 
 #define LIFE_ALIVE 0
 #define LIFE_DYING 1
@@ -393,6 +393,12 @@ Action TriggerTeleportHook(int entity, int other)
 			continue;
 		
 		hDestinationsArray.Push(lastEntity);
+	}
+	
+	if (!hDestinationsArray.Length) // if ArrayList is empty (no destination)
+	{
+		delete hDestinationsArray;
+		return Plugin_Handled;
 	}
 	
 	// Select a random destination from the list
