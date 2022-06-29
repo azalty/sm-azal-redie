@@ -13,7 +13,7 @@ Credits:
 #include <azalib>
 #include <colorvariables>
 
-#define PLUGIN_VERSION "0.8.4 BETA"
+#define PLUGIN_VERSION "0.8.5 BETA"
 
 #define LIFE_ALIVE 0
 #define LIFE_DYING 1
@@ -94,6 +94,7 @@ public void OnPluginStart()
 	// Events
 	HookEvent("round_start", OnRoundStart);
 	HookEvent("round_start", OnRoundEndPre, EventHookMode_Pre);
+	HookEvent("player_spawn", OnPlayerSpawnPre, EventHookMode_Pre);
 	HookEvent("player_death", OnPlayerDeathPre, EventHookMode_Pre);
 	AddNormalSoundHook(OnNormalSound);
 	HookEntityOutput("func_door", "OnBlockedOpening", OnDoorBlocked);
@@ -157,7 +158,7 @@ public void OnConfigsExecuted()
 		RegConsoleCmd(sCommands[i], Cmd_Ghost, "Become a ghost and play after you die, redie mechanic.");
 	}
 	
-	// Late load handling
+	// Late load handling for entity hooks
 	for (int i = MAXPLAYERS + 1; i <= MAXENTITIES; i++)
 	{
 		if (!IsValidEntity(i))
@@ -173,6 +174,16 @@ public void OnClientPutInServer(int client)
 	SDKHook(client, SDKHook_WeaponCanUse, OnWeaponCanUse);
 	SDKHook(client, SDKHook_SetTransmit, OnSetTransmit);
 	SDKHook(client, SDKHook_TraceAttack, OnTraceAttack);
+}
+
+public void OnPluginEnd()
+{
+	// Unghost players when unloading
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (g_bIsGhost[i])
+			UnGhost(i);
+	}
 }
 
 public void OnClientDisconnect(int client)
@@ -230,7 +241,7 @@ Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &damage, i
 	if (!IsValidEntity(victim) || !g_bIsGhost[victim])
 		return Plugin_Continue;
 	
-	if (cvarBlockKnife.IntValue >= 1)
+	if (cvarBlockKnife.IntValue >= 1 && (damagetype & DMG_SLASH)) // DMG_SLASH = stab, knife damage
 	{
 		if (1 <= attacker <= MaxClients)
 			LogMessage("%L blocked the knife attack of %L", victim, attacker);
@@ -271,6 +282,18 @@ Action OnRoundEndPre(Event event, const char[] name, bool dontBroadcast)
 		if (g_bIsGhost[i])
 			UnGhost(i, true);
 	}
+}
+
+Action OnPlayerSpawnPre(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (!g_bIsGhost[client] || g_bStripWeapons[client]) // g_bStripWeapons[client] is true when the player is spawning as Ghost through the Ghost() function.
+		return Plugin_Continue;
+	
+	// Mid-game respawn support, remove the Ghost mechanic from the player
+	UnGhost(client, true); // Don't set the player as alive and kill them to fix their status. Respawning them already marked them as alive and thus, fixed the problems.
+	
+	return Plugin_Continue;
 }
 
 Action OnPlayerDeathPre(Event event, const char[] name, bool dontBroadcast)
@@ -521,6 +544,29 @@ void Ghost(int client)
 	g_bStripWeapons[client] = true;
 	CS_RespawnPlayer(client);
 	g_bStripWeapons[client] = false;
+	
+	// Fix knife (https://github.com/azalty/sm-azal-redie/issues/3)
+	
+	// Not all weapons are removed. We make sure to remove them all correctly here.
+	int wepId;
+	while ((wepId = GetPlayerWeaponSlot(client, 2)) != -1) // Get the top weapon in the knife slot. It will always be knives first, then potentially a taser.
+	{
+		RemovePlayerItem(client, wepId);
+		RemoveEntity(wepId);
+	}
+	
+	/* * The taser is bugged. If a player has a taser without a knife, their knife will be bugged.
+	 * Here, to fix that problem, we give a knife to the player then remove it. */
+	g_bIsGhost[client] = false; // Remove the "ghost" mark so that they can equip the knife.
+	wepId = GivePlayerItem(client, "weapon_knife");
+	if (wepId != -1)
+	{
+		RemovePlayerItem(client, wepId);
+		RemoveEntity(wepId);
+	}
+	g_bIsGhost[client] = true;
+	// Knife fix end
+	
 	SetEntProp(client, Prop_Send, "m_lifeState", LIFE_DYING); // IsPlayerAlive will return false!
 	SetEntProp(client, Prop_Send, "m_CollisionGroup", COLLISION_GROUP_DEBRIS_TRIGGER); // NoBlock: no collisions with other players
 	SetEntProp(client, Prop_Send, "m_bHasDefuser", 0);
